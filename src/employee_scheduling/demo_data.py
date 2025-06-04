@@ -42,9 +42,9 @@ class DemoDataParameters:
 
 demo_data_to_parameters: dict[DemoData, DemoDataParameters] = {
     DemoData.SMALL: DemoDataParameters(
-        locations=("Ambulatory care", "Critical care", "Pediatric care"),
-        required_skills=("Doctor", "Nurse"),
-        optional_skills=("Anaesthetics", "Cardiology"),
+        locations=("Production",),
+        required_skills=("Florist",),
+        optional_skills=(),
         days_in_schedule=14,
         employee_count=15,
         optional_skill_distribution=(
@@ -65,15 +65,9 @@ demo_data_to_parameters: dict[DemoData, DemoDataParameters] = {
     ),
 
     DemoData.LARGE: DemoDataParameters(
-        locations=("Ambulatory care",
-                   "Neurology",
-                   "Critical care",
-                   "Pediatric care",
-                   "Surgery",
-                   "Radiology",
-                   "Outpatient"),
-        required_skills=("Doctor", "Nurse"),
-        optional_skills=("Anaesthetics", "Cardiology", "Radiology"),
+        locations=("Production",),
+        required_skills=("Florist",),
+        optional_skills=(),
         days_in_schedule=28,
         employee_count=50,
         optional_skill_distribution=(
@@ -149,11 +143,16 @@ def generate_demo_data(demo_data_or_parameters: DemoData | DemoDataParameters) -
         count, = random.choices(population=counts(parameters.optional_skill_distribution),
                                 weights=weights(parameters.optional_skill_distribution))
         skills = []
-        skills += random.sample(parameters.optional_skills, count)
+        skills += random.sample(parameters.optional_skills, count) if parameters.optional_skills else []
         skills += random.sample(parameters.required_skills, 1)
         employees.append(
-            Employee(name=name_permutations[i],
-                     skills=set(skills))
+            Employee(
+                name=name_permutations[i],
+                skills=set(skills),
+                unavailable_dates=set(),
+                undesired_dates=set(),
+                desired_dates=set()
+            )
         )
 
     shifts: list[Shift] = []
@@ -188,12 +187,14 @@ def generate_demo_data(demo_data_or_parameters: DemoData | DemoDataParameters) -
 
     return EmployeeSchedule(
         employees=employees,
-        shifts=shifts
+        shifts=shifts,
+        score=None,
+        solver_status=None
     )
 
 
 def generate_shifts_for_day(parameters: DemoDataParameters, current_date: date, random: Random,
-                            ids: Generator[str, any, any]) -> list[Shift]:
+                            ids: Generator[str, None, None]) -> list[Shift]:
     global location_to_shift_start_time_list_map
     shifts = []
     for location in parameters.locations:
@@ -208,21 +209,20 @@ def generate_shifts_for_day(parameters: DemoDataParameters, current_date: date, 
 
 
 def generate_shifts_for_timeslot(parameters: DemoDataParameters, timeslot_start: datetime, timeslot_end: datetime,
-                                 location: str, random: Random, ids: Generator[str, any, any]) -> list[Shift]:
+                                 location: str, random: Random, ids: Generator[str, None, None]) -> list[Shift]:
     shift_count, = random.choices(population=counts(parameters.shift_count_distribution),
                                   weights=weights(parameters.shift_count_distribution))
 
     shifts = []
     for i in range(shift_count):
-        if random.random() >= 0.5:
-            required_skill = random.choice(parameters.required_skills)
-        else:
-            required_skill = random.choice(parameters.optional_skills)
+        required_skill = random.choice(parameters.required_skills)
         shifts.append(Shift(
             id=next(ids),
             start=timeslot_start,
             end=timeslot_end,
             location=location,
-            required_skill=required_skill))
+            required_skill=required_skill,
+            employee=None
+        ))
 
     return shifts
